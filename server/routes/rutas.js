@@ -1,85 +1,88 @@
 import express from "express";
 import { pool } from "../db.js";
+import { optimizarRuta } from "../utils/algoritmo.js";
 
 const router = express.Router();
 
-// 🔹 Obtener todas las rutas guardadas
+// 🔹 Listar todas las rutas guardadas
 router.get("/", async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM rutas ORDER BY fecha DESC");
+    const [rows] = await pool.query(`
+      SELECT r.*, 
+             mo.nombre AS origen_nombre,
+             md.nombre AS destino_nombre
+      FROM rutas r
+      JOIN municipios mo ON r.origen_id = mo.id_mpio
+      JOIN municipios md ON r.destino_id = md.id_mpio
+      ORDER BY r.fecha DESC
+    `);
     res.json(rows);
   } catch (err) {
+    console.error("❌ Error al listar rutas:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 🔹 Crear y optimizar una nueva ruta
-router.post("/optimizar", async (req, res) => {
+// 🔹 Crear y optimizar una nueva ruta (considerando todo el grafo)
+router.post("/", async (req, res) => {
   try {
-    const { nombre, fecha, municipios } = req.body;
-    if (!municipios || municipios.length < 2) {
-      return res.status(400).json({ error: "Se requieren al menos 2 municipios" });
+    const { nombre, fecha, origen_id, destino_id, intermedios = [] } = req.body;
+
+    if (!nombre || !fecha || !origen_id || !destino_id) {
+      return res
+        .status(400)
+        .json({ error: "Faltan campos requeridos (nombre, fecha, origen, destino)" });
     }
 
-    // 🔹 Obtener todas las distancias necesarias
-    const [rows] = await pool.query("SELECT * FROM distancias");
+    // 🔹 Ejecutar algoritmo completo
+    const { orden, distanciaTotal } = await optimizarRuta(
+      origen_id,
+      destino_id,
+      intermedios
+    );
 
-    // 🔹 Construir un mapa de distancias
-    const distMap = {};
-    rows.forEach(d => {
-      const k = `${d.id_origen}-${d.id_destino}`;
-      const k2 = `${d.id_destino}-${d.id_origen}`;
-      distMap[k] = d.km;
-      distMap[k2] = d.km; // simétrico
-    });
-
-    // 🔹 Algoritmo vecino más cercano
-    const visitados = new Set();
-    let actual = municipios[0];
-    const orden = [actual];
-    visitados.add(actual);
-
-    while (visitados.size < municipios.length) {
-      let masCercano = null;
-      let minDist = Infinity;
-
-      for (const candidato of municipios) {
-        if (visitados.has(candidato)) continue;
-        const clave = `${actual}-${candidato}`;
-        const dist = distMap[clave] ?? Infinity;
-
-        if (dist < minDist) {
-          minDist = dist;
-          masCercano = candidato;
-        }
-      }
-
-      if (masCercano === null) break; // por si falta una distancia
-      orden.push(masCercano);
-      visitados.add(masCercano);
-      actual = masCercano;
-    }
-
-    // 🔹 Calcular distancia total
-    let total = 0;
-    for (let i = 0; i < orden.length - 1; i++) {
-      total += distMap[`${orden[i]}-${orden[i + 1]}`] ?? 0;
-    }
-
-    // 🔹 Guardar la ruta
+    // 🔹 Guardar en base de datos (TEXT)
     const [result] = await pool.query(
-      "INSERT INTO rutas (nombre, fecha, secuencia) VALUES (?, ?, ?)",
-      [nombre, fecha, JSON.stringify(orden)]
+      `INSERT INTO rutas (
+        nombre, fecha, origen_id, destino_id, id_intermedios, orden_optimo, distancia_total
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        nombre,
+        fecha,
+        origen_id,
+        destino_id,
+        JSON.stringify(intermedios),
+        JSON.stringify(orden),
+        distanciaTotal,
+      ]
     );
 
     res.json({
-      id: result.insertId,
+      id_ruta: result.insertId,
+      nombre,
+      fecha,
+      origen_id,
+      destino_id,
+      intermedios,
       orden,
-      distanciaTotal: total.toFixed(1),
+      distanciaTotal,
     });
   } catch (err) {
-    console.error("Error optimizando ruta:", err);
+    console.error("❌ Error al crear ruta:", err);
     res.status(500).json({ error: "Error al optimizar la ruta" });
+  }
+});
+
+// 🔹 Eliminar ruta
+router.delete("/:id", async (req, res) => {
+  try {
+    const [r] = await pool.query("DELETE FROM rutas WHERE id_ruta = ?", [
+      req.params.id,
+    ]);
+    res.json({ eliminado: r.affectedRows > 0 });
+  } catch (err) {
+    console.error("❌ Error eliminando ruta:", err);
+    res.status(500).json({ error: "Error al eliminar la ruta" });
   }
 });
 
