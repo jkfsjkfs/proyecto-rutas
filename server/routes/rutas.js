@@ -2,6 +2,7 @@ import express from "express";
 import { pool } from "../db.js";
 import { optimizarRuta } from "../utils/algoritmo.js";
 
+
 const router = express.Router();
 
 // 🔹 Listar todas las rutas guardadas
@@ -85,5 +86,56 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al eliminar la ruta" });
   }
 });
+
+
+
+
+router.put("/:id", async (req, res) => {
+  try {
+    const id_ruta = req.params.id;
+    const { nombre, fecha, origen_id, destino_id, intermedios = [] } = req.body;
+
+    if (!nombre || !fecha || !origen_id || !destino_id)
+      return res.status(400).json({ error: "Faltan campos requeridos" });
+
+    // 🔹 Recalcular optimización con nuevos datos
+    const { orden, distanciaTotal } = await optimizarRuta(
+      origen_id,
+      destino_id,
+      intermedios
+    );
+
+    // 🔹 Actualizar la base de datos
+    await pool.query(
+      `UPDATE rutas 
+       SET nombre=?, fecha=?, origen_id=?, destino_id=?, 
+           id_intermedios=?, orden_optimo=?, distancia_total=? 
+       WHERE id_ruta=?`,
+      [
+        nombre,
+        fecha,
+        origen_id,
+        destino_id,
+        JSON.stringify(intermedios),
+        JSON.stringify(orden),
+        distanciaTotal,
+        id_ruta,
+      ]
+    );
+
+    res.json({
+      id_ruta,
+      nombre,
+      fecha,
+      orden,
+      distanciaTotal,
+      actualizado: true,
+    });
+  } catch (err) {
+    console.error("❌ Error actualizando ruta:", err);
+    res.status(500).json({ error: "Error al actualizar la ruta" });
+  }
+});
+
 
 export default router;

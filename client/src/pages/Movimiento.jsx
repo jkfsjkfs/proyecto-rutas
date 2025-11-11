@@ -7,28 +7,38 @@ import {
   TrashIcon,
   MapPinIcon,
 } from "@heroicons/react/24/solid";
+import MapaRuta from "../components/MapaRuta"; // ✅ Nuevo componente
 
 export default function Movimiento() {
   const [rutas, setRutas] = useState([]);
   const [municipios, setMunicipios] = useState([]);
+  const [distancias, setDistancias] = useState([]);
+  const [editandoRuta, setEditandoRuta] = useState(null);
+  const [rutaSeleccionada, setRutaSeleccionada] = useState(null);
+  const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
   const [nuevaRuta, setNuevaRuta] = useState({
     nombre: "",
-    fecha: new Date().toISOString().split("T")[0], // 🔹 Fecha por defecto (hoy)
+    fecha: new Date().toISOString().split("T")[0],
     origen_id: "",
     destino_id: "",
     intermedios: [],
   });
-  const [mostrarModal, setMostrarModal] = useState(false);
-  const [resultado, setResultado] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
 
+  // 🔹 Cargar datos iniciales
   useEffect(() => {
     cargarRutas();
-    axios.get("/api/municipios").then((res) => {
-      console.log("📋 Municipios cargados:", res.data);
-      setMunicipios(res.data || []);
-    });
+    axios.get("/api/municipios").then((res) => setMunicipios(res.data || []));
   }, []);
+
+  // 🔹 Cargar distancias al abrir el mapa
+  useEffect(() => {
+    if (mostrarMapa) {
+      axios.get("/api/distancias").then((res) => setDistancias(res.data || []));
+    }
+  }, [mostrarMapa]);
 
   const cargarRutas = () => {
     axios.get("/api/rutas").then((res) => setRutas(res.data || []));
@@ -38,7 +48,6 @@ export default function Movimiento() {
     setNuevaRuta({ ...nuevaRuta, [e.target.name]: e.target.value });
   };
 
-  // ➕ Agregar parada intermedia (chips funcionales)
   const agregarIntermedio = (e) => {
     const value = e.target.value;
     if (!value) return;
@@ -47,14 +56,12 @@ export default function Movimiento() {
     const municipio = municipios.find((m) => Number(m.id_mpio) === id_mpio);
     if (!municipio) return;
 
-    // Evitar duplicados
     if (nuevaRuta.intermedios.some((m) => m.id_mpio === id_mpio)) return;
 
     setNuevaRuta((prev) => ({
       ...prev,
       intermedios: [...prev.intermedios, { id_mpio, nombre: municipio.nombre }],
     }));
-    setErrorMsg("");
     e.target.value = "";
   };
 
@@ -65,10 +72,8 @@ export default function Movimiento() {
     }));
   };
 
-  // ✅ Versión robusta de crearRuta con manejo de errores
-  const crearRuta = async (e) => {
+  const crearOActualizarRuta = async (e) => {
     e.preventDefault();
-
     try {
       if (nuevaRuta.nombre.trim().length < 10) {
         setErrorMsg("⚠️ El nombre de la ruta debe tener al menos 10 caracteres.");
@@ -79,8 +84,6 @@ export default function Movimiento() {
         return;
       }
 
-      setErrorMsg("");
-
       const dataEnviar = {
         nombre: nuevaRuta.nombre,
         fecha: nuevaRuta.fecha,
@@ -89,14 +92,16 @@ export default function Movimiento() {
         intermedios: nuevaRuta.intermedios.map((m) => m.id_mpio),
       };
 
-      console.log("📤 Enviando datos:", dataEnviar);
-
-      const res = await axios.post("/api/rutas", dataEnviar);
-
-      console.log("✅ Respuesta del servidor:", res.data);
+      let res;
+      if (editandoRuta) {
+        res = await axios.put(`/api/rutas/${editandoRuta.id_ruta}`, dataEnviar);
+      } else {
+        res = await axios.post("/api/rutas", dataEnviar);
+      }
 
       setResultado(res.data);
       setMostrarModal(false);
+      setEditandoRuta(null);
       setNuevaRuta({
         nombre: "",
         fecha: new Date().toISOString().split("T")[0],
@@ -106,12 +111,26 @@ export default function Movimiento() {
       });
       cargarRutas();
     } catch (err) {
-      console.error("❌ Error creando ruta:", err.response?.data || err.message);
-      setErrorMsg(
-        err.response?.data?.error ||
-          "Error al crear la ruta. Revisa la consola para más detalles."
-      );
+      console.error("❌ Error guardando ruta:", err.response?.data || err.message);
+      setErrorMsg(err.response?.data?.error || "Error al guardar la ruta.");
     }
+  };
+
+  const editarRuta = (ruta) => {
+    setEditandoRuta(ruta);
+    setNuevaRuta({
+      nombre: ruta.nombre,
+      fecha: ruta.fecha ? new Date(ruta.fecha).toISOString().split("T")[0] : "",
+      origen_id: ruta.origen_id,
+      destino_id: ruta.destino_id,
+      intermedios: ruta.id_intermedios
+        ? JSON.parse(ruta.id_intermedios).map((id) => {
+            const m = municipios.find((x) => x.id_mpio === id);
+            return { id_mpio: id, nombre: m?.nombre || `Mpio ${id}` };
+          })
+        : [],
+    });
+    setMostrarModal(true);
   };
 
   const eliminarRuta = async (id_ruta) => {
@@ -125,28 +144,38 @@ export default function Movimiento() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* --- Encabezado --- */}
+      {/* Encabezado */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           🚚 <span>Rutas de Entrega</span>
         </h1>
         <button
-          onClick={() => setMostrarModal(true)}
+          onClick={() => {
+            setEditandoRuta(null);
+            setNuevaRuta({
+              nombre: "",
+              fecha: new Date().toISOString().split("T")[0],
+              origen_id: "",
+              destino_id: "",
+              intermedios: [],
+            });
+            setMostrarModal(true);
+          }}
           className="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition"
         >
           + Crear nueva ruta
         </button>
       </div>
 
-      {/* --- Resultado --- */}
+      {/* Resultado */}
       {resultado && (
         <div className="bg-green-50 border border-green-300 text-green-800 rounded-md p-3 mb-6">
-          ✅ Ruta optimizada creada:
-          <strong> {resultado.orden.join(" → ")}</strong> ({resultado.distanciaTotal} km)
+          ✅ {editandoRuta ? "Ruta reoptimizada:" : "Ruta creada:"}{" "}
+          <strong>{resultado.orden.join(" → ")}</strong> ({resultado.distanciaTotal} km)
         </div>
       )}
 
-      {/* --- Tabla --- */}
+      {/* Tabla */}
       <div className="overflow-x-auto shadow-lg rounded-xl bg-white border border-gray-200">
         <table className="min-w-full border-collapse">
           <thead className="bg-gradient-to-r from-blue-900 to-slate-900 text-white">
@@ -174,12 +203,17 @@ export default function Movimiento() {
                   <td className="py-3 px-6 flex justify-center gap-4">
                     <button
                       title="Ver en mapa"
+                      onClick={() => {
+                        setRutaSeleccionada(r);
+                        setMostrarMapa(true);
+                      }}
                       className="text-blue-600 hover:text-blue-800 transition"
                     >
                       <MapPinIcon className="h-5 w-5" />
                     </button>
                     <button
                       title="Editar ruta"
+                      onClick={() => editarRuta(r)}
                       className="text-yellow-500 hover:text-yellow-700 transition"
                     >
                       <PencilIcon className="h-5 w-5" />
@@ -208,14 +242,16 @@ export default function Movimiento() {
         </table>
       </div>
 
-      {/* --- Modal --- */}
+      {/* Modal de crear/editar */}
       {mostrarModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <form
-            onSubmit={crearRuta}
+            onSubmit={crearOActualizarRuta}
             className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6"
           >
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Crear nueva ruta</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              {editandoRuta ? "Editar ruta existente" : "Crear nueva ruta"}
+            </h2>
 
             {/* Fecha + Nombre */}
             <div className="flex gap-4 mb-6">
@@ -237,7 +273,6 @@ export default function Movimiento() {
                 <input
                   type="text"
                   name="nombre"
-                  placeholder="Ej: Entrega zona norte AM"
                   value={nuevaRuta.nombre}
                   onChange={manejarCambio}
                   required
@@ -345,6 +380,7 @@ export default function Movimiento() {
                 type="button"
                 onClick={() => {
                   setMostrarModal(false);
+                  setEditandoRuta(null);
                   setErrorMsg("");
                 }}
                 className="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400"
@@ -355,11 +391,21 @@ export default function Movimiento() {
                 type="submit"
                 className="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800"
               >
-                Optimizar y guardar
+                {editandoRuta ? "Reoptimizar y guardar" : "Optimizar y guardar"}
               </button>
             </div>
           </form>
         </div>
+      )}
+
+      {/* 🗺️ Modal del mapa */}
+      {mostrarMapa && rutaSeleccionada && (
+        <MapaRuta
+          municipios={municipios}
+          distancias={distancias}
+          ruta={JSON.parse(rutaSeleccionada.orden_optimo || "[]")}
+          onClose={() => setMostrarMapa(false)}
+        />
       )}
     </div>
   );
