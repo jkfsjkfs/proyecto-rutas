@@ -1,28 +1,38 @@
 import { pool } from "../db.js";
 
 /**
- * Calcula la ruta óptima entre origen y destino,
- * pasando por los intermedios indicados, pero considerando
- * todo el grafo de municipios y distancias.
- * Devuelve el orden total de municipios y la distancia acumulada.
+ * Calcula la ruta óptima entre origen, destino e intermedios usando
+ * Dijkstra + heurística del Vecino Más Cercano.
  */
 export async function optimizarRuta(origen_id, destino_id, intermedios = []) {
-  // 1️⃣ Obtener todas las distancias desde la BD
-  const [rows] = await pool.query("SELECT id_origen, id_destino, distancia_km FROM distancias");
+  console.log("🚀 Iniciando optimización de ruta");
+  console.log("📍 Origen:", origen_id, "→ Destino:", destino_id, "Intermedios:", intermedios);
 
-  // 2️⃣ Construir grafo simétrico
+  // 1️⃣ Obtener todas las distancias desde la BD
+  const [rows] = await pool.query(
+    "SELECT id_origen, id_destino, distancia_km FROM distancias"
+  );
+
+  // 2️⃣ Construir grafo simétrico (todas las rutas posibles)
   const grafo = {};
   for (const d of rows) {
-    if (!grafo[d.id_origen]) grafo[d.id_origen] = {};
-    if (!grafo[d.id_destino]) grafo[d.id_destino] = {};
-    grafo[d.id_origen][d.id_destino] = d.km;
-    grafo[d.id_destino][d.id_origen] = d.km;
+    const origen = String(d.id_origen);
+    const destino = String(d.id_destino);
+    const dist = Number(d.distancia_km);
+
+    if (!grafo[origen]) grafo[origen] = {};
+    if (!grafo[destino]) grafo[destino] = {};
+
+    grafo[origen][destino] = dist;
+    grafo[destino][origen] = dist;
   }
 
-  // 🔹 Puntos a visitar (incluye origen y destino)
-  const puntos = [origen_id, ...intermedios, destino_id].map(Number);
+  console.log("🗺️ Grafo cargado con", Object.keys(grafo).length, "nodos.");
 
-  // 3️⃣ Calcular matriz de distancias mínimas entre cada punto
+  // 3️⃣ Puntos a visitar (origen, intermedios, destino)
+  const puntos = [origen_id, ...intermedios, destino_id].map(String);
+
+  // 4️⃣ Calcular matriz de distancias mínimas entre cada punto (usando Dijkstra)
   const matriz = {};
   for (const origen of puntos) {
     const distancias = dijkstra(grafo, origen);
@@ -33,35 +43,36 @@ export async function optimizarRuta(origen_id, destino_id, intermedios = []) {
     }
   }
 
-  // 4️⃣ Calcular orden óptimo (TSP simplificado)
+  // 5️⃣ Calcular orden óptimo (heurística del Vecino Más Cercano)
   const orden = tspVecinoMasCercano(puntos, matriz);
 
-  // 5️⃣ Calcular distancia total
+  // 6️⃣ Calcular distancia total
   let distanciaTotal = 0;
   for (let i = 0; i < orden.length - 1; i++) {
     distanciaTotal += matriz[`${orden[i]}-${orden[i + 1]}`] ?? 0;
   }
 
-  // 6️⃣ Devuelve los resultados
+  console.log("🧭 Orden óptimo:", orden.join(" → "));
+  console.log("📏 Distancia total:", distanciaTotal.toFixed(2), "km");
+
+  // 7️⃣ Devolver resultados
   return {
-    orden,
+    orden: orden.map(Number),
     distanciaTotal: Number(distanciaTotal.toFixed(2)),
   };
 }
 
 /**
- * Dijkstra — calcula la distancia mínima desde un nodo de origen a todos los demás.
- * @param {Object} grafo - objeto con forma { origen: { destino: km } }
- * @param {number} inicio - nodo inicial
- * @returns {Object} distancias mínimas { id_mpio: km }
+ * Algoritmo de Dijkstra: calcula la distancia mínima desde un nodo de origen a todos los demás.
  */
 function dijkstra(grafo, inicio) {
   const dist = {};
   const visitado = new Set();
   const nodos = Object.keys(grafo);
+  const inicioStr = String(inicio);
 
   for (const n of nodos) dist[n] = Infinity;
-  dist[inicio] = 0;
+  dist[inicioStr] = 0;
 
   while (visitado.size < nodos.length) {
     // nodo no visitado con menor distancia
@@ -89,8 +100,7 @@ function dijkstra(grafo, inicio) {
 }
 
 /**
- * Heurística del Vecino Más Cercano para resolver TSP.
- * Devuelve el orden de los puntos visitados.
+ * Heurística del Vecino Más Cercano para el problema del viajero (TSP simplificado)
  */
 function tspVecinoMasCercano(puntos, matriz) {
   const visitados = new Set();

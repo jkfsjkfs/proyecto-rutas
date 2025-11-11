@@ -1,9 +1,8 @@
 
-DROP SCHEMA entregas IF EXISTS;
-CREATE SCHEMA entregas;
+-- CREATE SCHEMA entregas;
 
 
-USE entregas;
+USE bq0fe1atouxr0cdkw6yi;
 -- ============================================================
 -- 1. Creación de tablas
 -- ============================================================
@@ -78,6 +77,7 @@ INSERT INTO distancias (id_origen, id_destino, distancia_km) VALUES
 -- SELECT id_destino, id_origen, distancia_km FROM distancias;
 
 
+
 CREATE TABLE rutas (
   id_ruta INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(100) NOT NULL,
@@ -91,6 +91,8 @@ CREATE TABLE rutas (
   FOREIGN KEY (origen_id) REFERENCES municipios(id_mpio),
   FOREIGN KEY (destino_id) REFERENCES municipios(id_mpio)
 );
+
+
 
 
 
