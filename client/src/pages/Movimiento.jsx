@@ -383,31 +383,7 @@ useEffect(() => {
                   ))}
               </select>
         
-        {editandoRuta && editandoRuta.orden_optimo && (
-  <div className="flex flex-wrap gap-2 mt-3">
-    
-    <div className="bg-green-50 border border-green-300 text-green-900 rounded-md p-3 mb-4 text-sm">
-      <span>🗺️<strong>Ruta actual:</strong></span>{" "}
-      <div>
-      <span className="font-semibold">
-        {JSON.parse(editandoRuta.orden_optimo)
-          .map((id) => {
-            const m = municipios.find((x) => x.id_mpio === id);
-            return m ? m.nombre : `Mpio ${id}`;
-          })
-          .join(" → ")}
-      </span>
-      {editandoRuta.distancia_total && (
-        <> ({editandoRuta.distancia_total} km)</>
-      )}
-      </div>
-    </div>
-  </div>
-)}
-
-
-
-
+        
               <div className="flex flex-wrap gap-2 mt-3">
                 {nuevaRuta.intermedios.map((mun) => (
                   <span
@@ -430,6 +406,29 @@ useEffect(() => {
                 </div>
               )}
             </div>
+
+
+{editandoRuta && editandoRuta.orden_optimo && (
+  <div className="flex flex-wrap gap-2 mt-3">
+    
+    <div className="bg-green-50 border border-green-300 text-green-900 rounded-md p-3 mb-4 text-sm">
+      <span>🗺️<strong>Ruta actual:</strong></span>{" "}
+      <div>
+      <span className="font-semibold">
+        {JSON.parse(editandoRuta.orden_optimo)
+          .map((id) => {
+            const m = municipios.find((x) => x.id_mpio === id);
+            return m ? m.nombre : `Mpio ${id}`;
+          })
+          .join(" → ")}
+      </span>
+      {editandoRuta.distancia_total && (
+        <> ({editandoRuta.distancia_total} km)</>
+      )}
+      </div>
+    </div>
+  </div>
+)}
 
             {/* Botones */}
             <div className="flex justify-end space-x-3">
