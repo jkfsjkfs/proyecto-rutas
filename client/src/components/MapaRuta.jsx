@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import api from "../api"; // ✅ Cliente Axios centralizado
 
 export default function MapaRuta({ municipios, distancias, ruta, distanciaTotal, onClose }) {
   const graphRef = useRef();
@@ -22,39 +21,34 @@ export default function MapaRuta({ municipios, distancias, ruta, distanciaTotal,
 
   // 🔹 Generar nodos base
   const nodes = municipios.map((m) => ({
-    id: m.id_mpio,
+    id: String(m.id_mpio),
     name: m.nombre,
     color: "lightgray",
   }));
 
   // 🔹 Generar enlaces (aristas)
   const links = distancias.map((d) => ({
-    source: d.id_origen,
-    target: d.id_destino,
+    source: String(d.id_origen),
+    target: String(d.id_destino),
     distance: d.km,
     color: "#bbb",
   }));
-
-  // 🔹 Layout circular (ordenado visualmente)
-  const radius = 300;
-  nodes.forEach((node, i) => {
-    const angle = (2 * Math.PI * i) / nodes.length;
-    node.fx = radius * Math.cos(angle);
-    node.fy = radius * Math.sin(angle);
-  });
 
   // 🔹 Resaltar ruta óptima
   if (ruta?.length > 1) {
     for (let i = 0; i < ruta.length - 1; i++) {
       const seg = links.find(
         (l) =>
-          (l.source === ruta[i] && l.target === ruta[i + 1]) ||
-          (l.target === ruta[i] && l.source === ruta[i + 1])
+          (l.source === String(ruta[i]) && l.target === String(ruta[i + 1])) ||
+          (l.target === String(ruta[i]) && l.source === String(ruta[i + 1]))
       );
-      if (seg) seg.color = "#ff0000"; // rojo = ruta óptima
+      if (seg) {
+        seg.color = "#ff0000"; // rojo = ruta óptima
+        seg.route = true; // marcar enlace de ruta
+      }
     }
     ruta.forEach((id) => {
-      const node = nodes.find((n) => n.id === id);
+      const node = nodes.find((n) => n.id === String(id));
       if (node) node.color = "#007bff"; // azul = nodo en la ruta
     });
   }
@@ -103,12 +97,17 @@ export default function MapaRuta({ municipios, distancias, ruta, distanciaTotal,
             height={size.height}
             graphData={{ nodes, links }}
             nodeLabel="name"
-            cooldownTicks={0} // ❄️ Evita movimiento
-            linkDirectionalParticles={0}
-            linkWidth={(link) => (link.color === "#ff0000" ? 3 : 1.3)}
+            cooldownTicks={100} // 🔄 permite que el layout se estabilice
+            backgroundColor="#ffffff"
+            // 🔹 Estilo de enlaces
             linkColor={(link) => link.color}
+            linkWidth={(link) => (link.route ? 3.5 : 1.2)}
+            linkDirectionalArrowLength={3.5}
+            linkDirectionalArrowRelPos={1}
+            linkDirectionalParticles={(link) => (link.route ? 2 : 0)} // animación solo en ruta
+            linkDirectionalParticleSpeed={0.006}
+            // 🔹 Dibuja nodos con etiquetas
             nodeCanvasObject={(node, ctx, globalScale) => {
-              // 🔵 Dibuja nodos
               const label = node.name;
               const fontSize = 12 / globalScale;
               ctx.font = `${fontSize}px Sans-Serif`;
@@ -118,21 +117,22 @@ export default function MapaRuta({ municipios, distancias, ruta, distanciaTotal,
               ctx.fill();
               ctx.textAlign = "center";
               ctx.textBaseline = "middle";
-              ctx.fillText(label, node.x, node.y - 10);
+              ctx.fillStyle = "#333";
+              ctx.fillText(label, node.x, node.y - 12);
             }}
+            // 🔹 Etiquetas de distancia sobre las aristas
             linkCanvasObjectMode={() => "after"}
             linkCanvasObject={(link, ctx) => {
-              // 🔸 Dibuja texto de distancia
               const start = link.source;
               const end = link.target;
               if (typeof start !== "object" || typeof end !== "object") return;
 
               const midX = (start.x + end.x) / 2;
               const midY = (start.y + end.y) / 2;
-
               ctx.save();
               ctx.font = "10px Sans-Serif";
-              ctx.fillStyle = link.color === "#ff0000" ? "red" : "#555";
+              ctx.fillStyle = link.color === "#ff0000" ? "red" : "#666";
+              ctx.textAlign = "center";
               ctx.fillText(`${link.distance} km`, midX, midY);
               ctx.restore();
             }}

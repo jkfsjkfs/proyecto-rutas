@@ -53,23 +53,14 @@ export default function App() {
 
           {/* 🚚 Movimiento */}
           <div>
-            <button
-              onClick={() => setOpenMov(!openMov)}
+            <Link
+              to="/rutas"
               className="w-full flex justify-between items-center px-2 py-2 font-semibold hover:bg-white/10 rounded-md"
             >
               <span>🚚 Movimiento</span>
-              <span>{openMov ? "▾" : "▸"}</span>
-            </button>
-            {openMov && (
-              <ul className="ml-3 mt-1 space-y-1 text-sm text-blue-100">
-                <li>
-                  <Link className={linkClass("/rutas")} to="/rutas">
-                    🧭 Rutas
-                  </Link>
-                </li>
-              </ul>
-            )}
+            </Link>
           </div>
+
         </nav>
 
         {/* Pie del menú */}
