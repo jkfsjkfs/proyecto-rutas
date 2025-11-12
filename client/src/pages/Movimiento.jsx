@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api"; // ✅ Cliente Axios centralizado
+
 import {
   XMarkIcon,
   ExclamationTriangleIcon,
@@ -7,7 +8,7 @@ import {
   TrashIcon,
   MapPinIcon,
 } from "@heroicons/react/24/solid";
-import MapaRuta from "../components/MapaRuta"; // ✅ Componente del mapa
+import MapaRuta from "../components/MapaRuta"; // ✅ Nuevo componente
 
 export default function Movimiento() {
   const [rutas, setRutas] = useState([]);
@@ -28,17 +29,21 @@ export default function Movimiento() {
   });
   const [mostrarResultado, setMostrarResultado] = useState(false);
 
-  // 🔹 Mostrar y ocultar el mensaje de éxito
-  useEffect(() => {
-    if (resultado) {
-      setMostrarResultado(true);
-      const timer = setTimeout(() => {
-        setMostrarResultado(false);
-        setTimeout(() => setResultado(null), 700);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [resultado]);
+
+
+  // 🔹 Ocultar mensaje de éxito después de 4 segundos
+// 🔹 Mostrar y ocultar el mensaje con efecto fade
+useEffect(() => {
+  if (resultado) {
+    setMostrarResultado(true); // aparece
+    const timer = setTimeout(() => {
+      setMostrarResultado(false); // inicia desvanecimiento
+      setTimeout(() => setResultado(null), 700); // lo retira del DOM tras la animación
+    }, 4000);
+    return () => clearTimeout(timer);
+  }
+}, [resultado]);
+
 
   // 🔹 Cargar datos iniciales
   useEffect(() => {
@@ -46,7 +51,7 @@ export default function Movimiento() {
     api.get("/municipios").then((res) => setMunicipios(res.data || []));
   }, []);
 
-  // 🔹 Cargar distancias cuando se abre el mapa
+  // 🔹 Cargar distancias al abrir el mapa
   useEffect(() => {
     if (mostrarMapa) {
       api.get("/distancias").then((res) => setDistancias(res.data || []));
@@ -130,6 +135,7 @@ export default function Movimiento() {
   };
 
   const editarRuta = (ruta) => {
+    
     setEditandoRuta(ruta);
     setNuevaRuta({
       nombre: ruta.nombre,
@@ -144,6 +150,7 @@ export default function Movimiento() {
         : [],
     });
     setMostrarModal(true);
+    
   };
 
   const eliminarRuta = async (id_ruta) => {
@@ -180,28 +187,27 @@ export default function Movimiento() {
         </button>
       </div>
 
-      {resultado && (
-        <div
-          className={`transition-all duration-700 ease-out transform ${
-            mostrarResultado
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 -translate-y-2"
-          } bg-green-50 border border-green-300 text-green-800 rounded-md p-3 mb-6`}
-        >
-          ✅ {editandoRuta ? "Ruta reoptimizada:" : "Ruta creada:"}{" "}
-          <strong>
-            {resultado.orden
-              .map((id) => {
-                const m = municipios.find((x) => x.id_mpio === id);
-                return m ? m.nombre : `Mpio ${id}`;
-              })
-              .join(" → ")}
-          </strong>{" "}
-          ({resultado.distanciaTotal} km)
-        </div>
-      )}
+{resultado && (
+  <div
+    className={`transition-all duration-700 ease-out transform ${
+      mostrarResultado ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
+    } bg-green-50 border border-green-300 text-green-800 rounded-md p-3 mb-6`}
+  >
+    ✅ {editandoRuta ? "Ruta reoptimizada:" : "Ruta creada:"}{" "}
+    <strong>
+      {resultado.orden
+        .map((id) => {
+          const m = municipios.find((x) => x.id_mpio === id);
+          return m ? m.nombre : `Mpio ${id}`;
+        })
+        .join(" → ")}
+    </strong>{" "}
+    ({resultado.distanciaTotal} km)
+  </div>
+)}
 
-      {/* Tabla de rutas */}
+
+      {/* Tabla */}
       <div className="overflow-x-auto shadow-lg rounded-xl bg-white border border-gray-200">
         <table className="min-w-full border-collapse">
           <thead className="bg-gradient-to-r from-blue-900 to-slate-900 text-white">
@@ -268,7 +274,7 @@ export default function Movimiento() {
         </table>
       </div>
 
-      {/* Modal de crear/editar ruta */}
+      {/* Modal de crear/editar */}
       {mostrarModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <form
@@ -279,7 +285,7 @@ export default function Movimiento() {
               {editandoRuta ? "Editar ruta existente" : "Crear nueva ruta"}
             </h2>
 
-            {/* Fecha y nombre */}
+            {/* Fecha + Nombre */}
             <div className="flex gap-4 mb-6">
               <div className="w-[30%]">
                 <label className="text-sm font-medium text-gray-600">Fecha</label>
@@ -308,7 +314,7 @@ export default function Movimiento() {
               </div>
             </div>
 
-            {/* Origen y destino */}
+            {/* Origen / Destino */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-semibold text-blue-700 mb-2">
@@ -329,6 +335,7 @@ export default function Movimiento() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-semibold text-blue-700 mb-2">
                   Municipio de Destino
@@ -375,6 +382,31 @@ export default function Movimiento() {
                     </option>
                   ))}
               </select>
+        
+        {editandoRuta && editandoRuta.orden_optimo && (
+  <div className="flex flex-wrap gap-2 mt-3">
+    
+    <div className="bg-green-50 border border-green-300 text-green-900 rounded-md p-3 mb-4 text-sm">
+      <span>🗺️<strong>Ruta actual:</strong></span>{" "}
+      <div>
+      <span className="font-semibold">
+        {JSON.parse(editandoRuta.orden_optimo)
+          .map((id) => {
+            const m = municipios.find((x) => x.id_mpio === id);
+            return m ? m.nombre : `Mpio ${id}`;
+          })
+          .join(" → ")}
+      </span>
+      {editandoRuta.distancia_total && (
+        <> ({editandoRuta.distancia_total} km)</>
+      )}
+      </div>
+    </div>
+  </div>
+)}
+
+
+
 
               <div className="flex flex-wrap gap-2 mt-3">
                 {nuevaRuta.intermedios.map((mun) => (
@@ -423,15 +455,16 @@ export default function Movimiento() {
         </div>
       )}
 
-      {/* Modal del mapa */}
+      {/* 🗺️ Modal del mapa */}
       {mostrarMapa && rutaSeleccionada && (
-        <MapaRuta
-          municipios={municipios}
-          distancias={distancias}
-          ruta={JSON.parse(rutaSeleccionada.orden_optimo || "[]")}
-          distanciaTotal={rutaSeleccionada.distancia_total}
-          onClose={() => setMostrarMapa(false)}
-        />
+<MapaRuta
+  municipios={municipios}
+  distancias={distancias}
+  ruta={JSON.parse(rutaSeleccionada.orden_optimo || "[]")}
+  distanciaTotal={rutaSeleccionada.distancia_total}
+  onClose={() => setMostrarMapa(false)}
+/>
+
       )}
     </div>
   );
