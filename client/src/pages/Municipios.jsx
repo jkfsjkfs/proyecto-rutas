@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api"; // ✅ Cliente Axios centralizado
 
 export default function Municipios() {
   const [municipios, setMunicipios] = useState([]);
 
   useEffect(() => {
-    axios.get("/api/municipios")
+    api.get("/municipios")
       .then((res) => setMunicipios(res.data))
       .catch(() => setMunicipios([]));
 

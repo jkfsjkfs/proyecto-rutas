@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api"; // ✅ Cliente Axios centralizado
 import {
   XMarkIcon,
   ExclamationTriangleIcon,
@@ -7,7 +7,7 @@ import {
   TrashIcon,
   MapPinIcon,
 } from "@heroicons/react/24/solid";
-import MapaRuta from "../components/MapaRuta"; // ✅ Nuevo componente
+import MapaRuta from "../components/MapaRuta"; // ✅ Componente del mapa
 
 export default function Movimiento() {
   const [rutas, setRutas] = useState([]);
@@ -28,37 +28,33 @@ export default function Movimiento() {
   });
   const [mostrarResultado, setMostrarResultado] = useState(false);
 
-
-
-  // 🔹 Ocultar mensaje de éxito después de 4 segundos
-// 🔹 Mostrar y ocultar el mensaje con efecto fade
-useEffect(() => {
-  if (resultado) {
-    setMostrarResultado(true); // aparece
-    const timer = setTimeout(() => {
-      setMostrarResultado(false); // inicia desvanecimiento
-      setTimeout(() => setResultado(null), 700); // lo retira del DOM tras la animación
-    }, 4000);
-    return () => clearTimeout(timer);
-  }
-}, [resultado]);
-
+  // 🔹 Mostrar y ocultar el mensaje de éxito
+  useEffect(() => {
+    if (resultado) {
+      setMostrarResultado(true);
+      const timer = setTimeout(() => {
+        setMostrarResultado(false);
+        setTimeout(() => setResultado(null), 700);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [resultado]);
 
   // 🔹 Cargar datos iniciales
   useEffect(() => {
     cargarRutas();
-    axios.get("/api/municipios").then((res) => setMunicipios(res.data || []));
+    api.get("/municipios").then((res) => setMunicipios(res.data || []));
   }, []);
 
-  // 🔹 Cargar distancias al abrir el mapa
+  // 🔹 Cargar distancias cuando se abre el mapa
   useEffect(() => {
     if (mostrarMapa) {
-      axios.get("/api/distancias").then((res) => setDistancias(res.data || []));
+      api.get("/distancias").then((res) => setDistancias(res.data || []));
     }
   }, [mostrarMapa]);
 
   const cargarRutas = () => {
-    axios.get("/api/rutas").then((res) => setRutas(res.data || []));
+    api.get("/rutas").then((res) => setRutas(res.data || []));
   };
 
   const manejarCambio = (e) => {
@@ -111,9 +107,9 @@ useEffect(() => {
 
       let res;
       if (editandoRuta) {
-        res = await axios.put(`/api/rutas/${editandoRuta.id_ruta}`, dataEnviar);
+        res = await api.put(`/rutas/${editandoRuta.id_ruta}`, dataEnviar);
       } else {
-        res = await axios.post("/api/rutas", dataEnviar);
+        res = await api.post("/rutas", dataEnviar);
       }
 
       setResultado(res.data);
@@ -152,7 +148,7 @@ useEffect(() => {
 
   const eliminarRuta = async (id_ruta) => {
     if (!window.confirm("¿Eliminar esta ruta?")) return;
-    await axios.delete(`/api/rutas/${id_ruta}`);
+    await api.delete(`/rutas/${id_ruta}`);
     cargarRutas();
   };
 
@@ -184,27 +180,28 @@ useEffect(() => {
         </button>
       </div>
 
-{resultado && (
-  <div
-    className={`transition-all duration-700 ease-out transform ${
-      mostrarResultado ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
-    } bg-green-50 border border-green-300 text-green-800 rounded-md p-3 mb-6`}
-  >
-    ✅ {editandoRuta ? "Ruta reoptimizada:" : "Ruta creada:"}{" "}
-    <strong>
-      {resultado.orden
-        .map((id) => {
-          const m = municipios.find((x) => x.id_mpio === id);
-          return m ? m.nombre : `Mpio ${id}`;
-        })
-        .join(" → ")}
-    </strong>{" "}
-    ({resultado.distanciaTotal} km)
-  </div>
-)}
+      {resultado && (
+        <div
+          className={`transition-all duration-700 ease-out transform ${
+            mostrarResultado
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 -translate-y-2"
+          } bg-green-50 border border-green-300 text-green-800 rounded-md p-3 mb-6`}
+        >
+          ✅ {editandoRuta ? "Ruta reoptimizada:" : "Ruta creada:"}{" "}
+          <strong>
+            {resultado.orden
+              .map((id) => {
+                const m = municipios.find((x) => x.id_mpio === id);
+                return m ? m.nombre : `Mpio ${id}`;
+              })
+              .join(" → ")}
+          </strong>{" "}
+          ({resultado.distanciaTotal} km)
+        </div>
+      )}
 
-
-      {/* Tabla */}
+      {/* Tabla de rutas */}
       <div className="overflow-x-auto shadow-lg rounded-xl bg-white border border-gray-200">
         <table className="min-w-full border-collapse">
           <thead className="bg-gradient-to-r from-blue-900 to-slate-900 text-white">
@@ -271,7 +268,7 @@ useEffect(() => {
         </table>
       </div>
 
-      {/* Modal de crear/editar */}
+      {/* Modal de crear/editar ruta */}
       {mostrarModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
           <form
@@ -282,7 +279,7 @@ useEffect(() => {
               {editandoRuta ? "Editar ruta existente" : "Crear nueva ruta"}
             </h2>
 
-            {/* Fecha + Nombre */}
+            {/* Fecha y nombre */}
             <div className="flex gap-4 mb-6">
               <div className="w-[30%]">
                 <label className="text-sm font-medium text-gray-600">Fecha</label>
@@ -311,7 +308,7 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Origen / Destino */}
+            {/* Origen y destino */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-semibold text-blue-700 mb-2">
@@ -332,7 +329,6 @@ useEffect(() => {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-blue-700 mb-2">
                   Municipio de Destino
@@ -379,31 +375,6 @@ useEffect(() => {
                     </option>
                   ))}
               </select>
-        
-        {editandoRuta && editandoRuta.orden_optimo && (
-  <div className="flex flex-wrap gap-2 mt-3">
-    
-    <div className="bg-green-50 border border-green-300 text-green-900 rounded-md p-3 mb-4 text-sm">
-      <span>🗺️<strong>Ruta actual:</strong></span>{" "}
-      <div>
-      <span className="font-semibold">
-        {JSON.parse(editandoRuta.orden_optimo)
-          .map((id) => {
-            const m = municipios.find((x) => x.id_mpio === id);
-            return m ? m.nombre : `Mpio ${id}`;
-          })
-          .join(" → ")}
-      </span>
-      {editandoRuta.distancia_total && (
-        <> ({editandoRuta.distancia_total} km)</>
-      )}
-      </div>
-    </div>
-  </div>
-)}
-
-
-
 
               <div className="flex flex-wrap gap-2 mt-3">
                 {nuevaRuta.intermedios.map((mun) => (
@@ -452,16 +423,15 @@ useEffect(() => {
         </div>
       )}
 
-      {/* 🗺️ Modal del mapa */}
+      {/* Modal del mapa */}
       {mostrarMapa && rutaSeleccionada && (
-<MapaRuta
-  municipios={municipios}
-  distancias={distancias}
-  ruta={JSON.parse(rutaSeleccionada.orden_optimo || "[]")}
-  distanciaTotal={rutaSeleccionada.distancia_total}
-  onClose={() => setMostrarMapa(false)}
-/>
-
+        <MapaRuta
+          municipios={municipios}
+          distancias={distancias}
+          ruta={JSON.parse(rutaSeleccionada.orden_optimo || "[]")}
+          distanciaTotal={rutaSeleccionada.distancia_total}
+          onClose={() => setMostrarMapa(false)}
+        />
       )}
     </div>
   );

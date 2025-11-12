@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
+import api from "../api"; // ✅ Cliente Axios centralizado
 
 export default function MapaRuta({ municipios, distancias, ruta, distanciaTotal, onClose }) {
   const graphRef = useRef();

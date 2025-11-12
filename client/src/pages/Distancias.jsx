@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api"; // ✅ Cliente Axios centralizado
 
 export default function Distancias() {
   const [distancias, setDistancias] = useState([]);
   const [municipios, setMunicipios] = useState([]);
 
   useEffect(() => {
-    axios.get("/api/municipios")
+    api.get("/municipios")
       .then((res) => setMunicipios(res.data))
       .catch(() => setMunicipios([]));
 
-    axios.get("/api/municipios/distancias")
+    api.get("/municipios/distancias")
       .then((res) => setDistancias(res.data))
       .catch(() => setDistancias([]));
 
