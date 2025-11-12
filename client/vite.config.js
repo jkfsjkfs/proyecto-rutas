@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Leer la variable del entorno del sistema (Render o local)
-const apiUrl = process.env.VITE_API_URL || "https://proyecto-rutas-back.onrender.com";
+const apiUrl = process.env.VITE_API_URL || "https://proyecto-rutas-back.onrender.com/";
 
 export default defineConfig({
   plugins: [react()],
